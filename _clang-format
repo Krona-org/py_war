@@ -1,0 +1,22 @@
+---
+# source link: https://clang.llvm.org/docs/ClangFormatStyleOptions.html
+BasedOnStyle: LLVM
+IndentWidth: 4
+---
+Language: Cpp
+#Standard: c++11
+# Force pointers to the type for C++.
+DerivePointerAlignment: false
+BreakConstructorInitializers: BeforeComma
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeParens: Always
+SpaceBeforeRangeBasedForLoopColon: true
+IndentCaseLabels: true
+ColumnLimit: 120
+SpaceAfterTemplateKeyword: true
+SpaceBeforeCpp11BracedList: true
+AlwaysBreakTemplateDeclarations: Yes
+SortIncludes: true
+IncludeBlocks: Regroup
+AlignTrailingComments: true
+...

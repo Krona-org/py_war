@@ -1,12 +1,12 @@
+#include "findlabel/data/findlabel.h"
+
+#include <Windows.h>
 #include <algorithm>
-#include <fstream>
 #include <iostream>
-#include <vector>
 
-using namespace std;
+int main () {
+    SetConsoleCP (65001);
+    SetConsoleOutputCP (65001);
 
-class FindLabel {
-  public:
-};
-
-int main () { return 0; }
+    return 0;
+}

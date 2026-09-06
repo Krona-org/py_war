@@ -12,7 +12,7 @@ SpaceBeforeAssignmentOperators: true
 SpaceBeforeParens: Always
 SpaceBeforeRangeBasedForLoopColon: true
 IndentCaseLabels: true
-ColumnLimit: 120
+ColumnLimit: 90
 SpaceAfterTemplateKeyword: true
 SpaceBeforeCpp11BracedList: true
 AlwaysBreakTemplateDeclarations: Yes

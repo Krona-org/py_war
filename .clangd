@@ -1,6 +1,7 @@
 CompileFlags:
   CompilationDatabase: build_debug
-  Add: [-std=c++20]
+  Compiler: D:/DeveloperSettings/MSYS2/mingw64/bin/g++.exe
+  Add: [-std=c++23]
 
 Diagnostics:
   UnusedIncludes: None

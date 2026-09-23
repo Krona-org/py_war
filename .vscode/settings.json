@@ -1,0 +1,14 @@
+{
+  "clangd.arguments": [
+    "--query-driver=D:/DeveloperSettings/MSYS2/mingw64/bin/g++.exe,D:/DeveloperSettings/MSYS2/mingw64/bin/gcc.exe,g++,gcc"
+  ],
+  "editor.formatOnSave": true,
+  "editor.inlineSuggest.enabled": true,
+  "[cpp]": {
+    "editor.defaultFormatter": "xaver.clang-format"
+  },
+  "[c]": {
+    "editor.defaultFormatter": "xaver.clang-format"
+  },
+  "clang-format.executable": "D:/DeveloperSettings/AndroidSdk/ndk/29.0.13599879/toolchains/llvm/prebuilt/windows-x86_64/bin/clang-format.exe"
+}

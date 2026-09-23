@@ -1,10 +1,8 @@
 ---
-# source link: https://clang.llvm.org/docs/ClangFormatStyleOptions.html
+Language: Cpp
 BasedOnStyle: LLVM
 IndentWidth: 2
----
-Language: Cpp
-#Standard: c++11
+
 # Force pointers to the type for C++.
 DerivePointerAlignment: false
 BreakConstructorInitializers: BeforeComma

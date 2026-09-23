@@ -1,4 +1,4 @@
-#include "findlabel.h"
+#include "scandocs.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -10,7 +10,7 @@
 
 namespace core {
 
-FindLabel::FindLabel (const std::filesystem::path &path) {
+ScanDocs::ScanDocs (const std::filesystem::path &path) {
   buffer_words_ = readFile (path);
   if (buffer_words_.empty ())
     return;
@@ -29,20 +29,20 @@ FindLabel::FindLabel (const std::filesystem::path &path) {
   }
 }
 
-FindLabel::~FindLabel () = default;
+ScanDocs::~ScanDocs () = default;
 
 // ---Геттеры---
-const std::vector<std::string_view> &FindLabel::getAllWords () const { return words_; }
+const std::vector<std::string_view> &ScanDocs::getAllWords () const { return words_; }
 
-const std::vector<std::string_view> &FindLabel::getUniqueWords () const { return uniqueWords_; }
+const std::vector<std::string_view> &ScanDocs::getUniqueWords () const { return uniqueWords_; }
 
-const std::vector<std::pair<std::string_view, uint32_t>> &FindLabel::getFrequency () const {
+const std::vector<std::pair<std::string_view, uint32_t>> &ScanDocs::getFrequency () const {
   return frequency_;
 }
 //---
 
 // ---Вспомогательные методы---
-std::string FindLabel::readFile (const std::filesystem::path &path) {
+std::string ScanDocs::readFile (const std::filesystem::path &path) {
   std::ifstream file (path, std::ios::binary | std::ios::ate);
 
   if (!file.is_open ())
@@ -57,13 +57,13 @@ std::string FindLabel::readFile (const std::filesystem::path &path) {
   return buffer;
 }
 
-std::vector<std::string_view> FindLabel::extractWordsSet (const std::vector<std::string_view> &words) {
+std::vector<std::string_view> ScanDocs::extractWordsSet (const std::vector<std::string_view> &words) {
   std::unordered_set<std::string_view> uWords (words.begin (), words.end ());
   std::vector<std::string_view> v_uWords (uWords.begin (), uWords.end ());
 
   return v_uWords;
 }
-std::vector<std::string_view> FindLabel::extractWordsVec (std::string_view buffer) {
+std::vector<std::string_view> ScanDocs::extractWordsVec (std::string_view buffer) {
   std::vector<std::string_view> words;
 
   size_t start = 0;
@@ -94,7 +94,7 @@ std::vector<std::string_view> FindLabel::extractWordsVec (std::string_view buffe
   return words;
 }
 
-void FindLabel::toLowerCaseInPlace (std::string &buffer) {
+void ScanDocs::toLowerCaseInPlace (std::string &buffer) {
   auto *p = reinterpret_cast<uint8_t *> (buffer.data ());
   const size_t len = buffer.size ();
 
@@ -121,10 +121,10 @@ void FindLabel::toLowerCaseInPlace (std::string &buffer) {
   }
 }
 
-bool FindLabel::isWordChar (uint8_t c) { return (c >= 128) || (c >= 'a' && c <= 'z'); }
+bool ScanDocs::isWordChar (uint8_t c) { return (c >= 128) || (c >= 'a' && c <= 'z'); }
 
 std::vector<std::pair<std::string_view, uint32_t>>
-FindLabel::extractFrequency (const std::vector<std::string_view> &words) {
+ScanDocs::extractFrequency (const std::vector<std::string_view> &words) {
   if (words.empty ())
     return {};
 
@@ -151,7 +151,7 @@ FindLabel::extractFrequency (const std::vector<std::string_view> &words) {
   return freq;
 }
 
-size_t FindLabel::getLetterLength (const uint8_t *p, size_t remaining) {
+size_t ScanDocs::getLetterLength (const uint8_t *p, size_t remaining) {
   // английская буква (a-z) — 1 байт
   if (*p >= 'a' && *p <= 'z') {
     return 1;
@@ -168,7 +168,7 @@ size_t FindLabel::getLetterLength (const uint8_t *p, size_t remaining) {
   return 0;
 }
 
-std::vector<std::pair<std::string_view, std::vector<uint32_t>>> FindLabel::buildWordIndex () const {
+std::vector<std::pair<std::string_view, std::vector<uint32_t>>> ScanDocs::buildWordIndex () const {
   if (words_.empty ())
     return {};
 
@@ -206,7 +206,7 @@ std::vector<std::pair<std::string_view, std::vector<uint32_t>>> FindLabel::build
   return index;
 }
 
-void FindLabel::printWordIndex (std::ostream &out, size_t limit) const {
+void ScanDocs::printWordIndex (std::ostream &out, size_t limit) const {
   auto index = buildWordIndex ();
   size_t count = std::min (limit, index.size ());
   for (size_t i = 0; i < count; ++i) {

@@ -13,12 +13,17 @@ namespace {
 
 using json = nlohmann::json;
 
-std::filesystem::path g_resourcesDir = "resources";
-std::string g_currentLang = "ru";
-bool g_isExplicitLang = false;
-std::vector<std::string> g_availableLanguages = {"ru", "en"};
-std::unordered_map<std::string, std::string> g_strings;
+// Внутреннее состояние локализации
+std::filesystem::path g_resourcesDir = "resources";             ///< Разрешенный относительный путь к каталогу ресурсов
+std::string g_currentLang = "ru";                               ///< Текущий активный код языка ("ru", "en")
+bool g_isExplicitLang = false;                                  ///< Задан ли язык явно через флаг командной строки (--lang)
+std::vector<std::string> g_availableLanguages = {"ru", "en"};   ///< Доступные языки из languages.json
+std::unordered_map<std::string, std::string> g_strings;         ///< Загруженная в память хэш-таблица строк текущего языка
 
+/// @brief Получение пути к каталогу, содержащему исполняемый файл (.exe) процесса
+/// Использует Win32 API GetModuleFileNameW для получения полного пути к запущенному модулю,
+/// что позволяет приложению оставаться полностью независимым от текущего рабочего каталога (CWD).
+/// @return Путь к папке с исполняемым файлом
 std::filesystem::path getExecutableDir () {
   wchar_t buffer[MAX_PATH];
   DWORD length = GetModuleFileNameW (NULL, buffer, MAX_PATH);
@@ -28,6 +33,16 @@ std::filesystem::path getExecutableDir () {
   return {};
 }
 
+/// @brief Поиск папки с ресурсами по цепочке относительных путей
+/// Исключает жесткую привязку к абсолютным путям диска разработчика.
+/// Проверяет следующие места поиска:
+/// 1. Непосредственно указанный путь (например, "./resources")
+/// 2. Относительно текущего рабочего каталога
+/// 3. На один уровень выше текущего каталога (если запуск из build_debug/)
+/// 4. Рядом с исполняемым файлом .exe (exeDir / resources)
+/// 5. На уровень выше исполняемого файла (exeDir / ../resources)
+/// @param baseDir Базовое имя папки ресурсов
+/// @return Найденный путь к каталогу ресурсов
 std::filesystem::path resolveResourcesPath (const std::string &baseDir) {
   std::filesystem::path exeDir = getExecutableDir ();
 
@@ -51,6 +66,11 @@ std::filesystem::path resolveResourcesPath (const std::string &baseDir) {
   return baseDir;
 }
 
+/// @brief Загрузка строковых ресурсов из JSON-файла для заданного языка
+/// Читает файл strings_<langCode>.json с помощью nlohmann::json и заполняет хэш-таблицу g_strings.
+/// @param resDir Каталог с ресурсами
+/// @param langCode Код языка ("ru", "en")
+/// @return true, если файл успешно прочитан и распарсен
 bool loadLanguageStrings (const std::filesystem::path &resDir, const std::string &langCode) {
   std::filesystem::path stringsFile = resDir / ("strings_" + langCode + ".json");
   std::ifstream in (stringsFile);
@@ -59,6 +79,7 @@ bool loadLanguageStrings (const std::filesystem::path &resDir, const std::string
   }
 
   try {
+    // Парсим структуру JSON через nlohmann::json напрямую из файлового потока std::ifstream
     json data = json::parse (in);
     g_strings.clear ();
     for (auto it = data.begin (); it != data.end (); ++it) {
@@ -74,12 +95,21 @@ bool loadLanguageStrings (const std::filesystem::path &resDir, const std::string
 
 } // namespace
 
+/// @brief Автоматическое определение языка ввода по активной раскладке клавиатуры в Windows
+/// Логика работы:
+/// 1. GetForegroundWindow() находит окно переднего плана (терминал пользователя).
+/// 2. GetWindowThreadProcessId() получает идентификатор потока этого окна.
+/// 3. GetKeyboardLayout() возвращает дескриптор раскладки (HKL) активного потока ввода.
+/// 4. Младшие 16 бит (LOWORD) дескриптора содержат Language Identifier (LANGID).
+/// 5. Макрос PRIMARYLANGID отсекает региональные диалекты (оставляет базовый идентификатор языка).
+/// 6. Если базовый язык равен LANG_RUSSIAN (0x19) -> возвращаем "ru", иначе -> "en".
+/// @return Код языка: "ru" для русской раскладки, "en" для любой другой
 std::string detectKeyboardLanguage () {
-  // Получаем раскладку активного окна пользователя (консоли / терминала)
   HWND fgWnd = GetForegroundWindow ();
   DWORD threadId = fgWnd ? GetWindowThreadProcessId (fgWnd, NULL) : 0;
   HKL hkl = threadId ? GetKeyboardLayout (threadId) : NULL;
   if (!hkl) {
+    // Резервный опрос текущего потока приложения
     hkl = GetKeyboardLayout (0);
   }
 
@@ -91,7 +121,7 @@ std::string detectKeyboardLanguage () {
     }
   }
 
-  // Все что не рус — английский
+  // Все нерусские раскладки по требованию мапятся в английский язык
   return "en";
 }
 
@@ -103,6 +133,7 @@ bool init (const std::string &resourcesDir, const std::string &preferredLang) {
   g_resourcesDir = resolveResourcesPath (resourcesDir);
   g_isExplicitLang = !preferredLang.empty ();
 
+  // Загружаем список зарегистрированных языков из languages.json
   std::filesystem::path langConfigPath = g_resourcesDir / "languages.json";
   std::ifstream in (langConfigPath);
 
@@ -120,11 +151,12 @@ bool init (const std::string &resourcesDir, const std::string &preferredLang) {
     } catch (...) {}
   }
 
+  // Выбираем целевой язык: либо принудительный из командной строки,
+  // либо автоматически определяемый по текущей раскладке клавиатуры
   std::string targetLang;
   if (g_isExplicitLang) {
     targetLang = preferredLang;
   } else {
-    // Автоматическое определение по раскладке клавиатуры: рус -> ru, все остальное -> en
     targetLang = detectKeyboardLanguage ();
   }
 
@@ -135,7 +167,7 @@ bool setLanguage (const std::string &langCode) {
   g_currentLang = langCode;
   bool loaded = loadLanguageStrings (g_resourcesDir, langCode);
   if (!loaded && langCode != "ru") {
-    // Если запрошенный язык не найден, пробуем загрузить ru
+    // Если запрошенный язык не найден, пробуем базовый русский
     loaded = loadLanguageStrings (g_resourcesDir, "ru");
   }
   return loaded;
@@ -156,6 +188,7 @@ std::string tr (std::string_view key, std::string_view defaultVal) {
     return it->second;
   }
 
+  // Если ключ не найден в JSON-файле ресурсов, возвращаем дефолтное значение либо сам ключ
   if (!defaultVal.empty ()) {
     return std::string (defaultVal);
   }

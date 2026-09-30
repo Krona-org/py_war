@@ -20,6 +20,9 @@ public:
   /// @brief Тип для хранения индекса слов
   using WordIndex = std::vector<std::pair<std::string_view, std::vector<uint32_t>>>;
 
+  /// @brief Конструктор по умолчанию (создает пустой объект)
+  ScanDocs () = default;
+
   /// @brief Конструктор, который выполняет загрузку и обработку файла
   /// @param path Путь к файлу
   explicit ScanDocs (const std::filesystem::path &path);
@@ -41,6 +44,10 @@ public:
   /// @brief Проверка успешности загрузки и отображения файла
   /// @return true, если файл успешно открыт и отображен
   bool isLoaded () const noexcept;
+
+  /// @brief Получение размера файла в байтах
+  /// @return Размер файла
+  size_t getFileSize () const noexcept;
 
   /// @brief Получение всех слов документа в порядке их следования
   /// @return Константная ссылка на вектор всех слов (string_view)

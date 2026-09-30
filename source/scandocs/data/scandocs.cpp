@@ -62,6 +62,8 @@ ScanDocs &ScanDocs::operator= (ScanDocs &&other) noexcept {
 
 bool ScanDocs::isLoaded () const noexcept { return isLoaded_; }
 
+size_t ScanDocs::getFileSize () const noexcept { return fileSize_; }
+
 // ---Геттеры данных---
 const std::vector<std::string_view> &ScanDocs::getAllWords () const noexcept { return words_; }
 
@@ -103,11 +105,11 @@ size_t ScanDocs::getLetterInfo (const uint8_t *p, const uint8_t *end, bool &isUp
   if (p + 1 < end) {
     uint8_t next = p[1]; /// Следующий байт
 
-    if ((next >= 0x90 && next <= 0xAF) || next == 0x81) { // 'А' .. 'Я', 'Ё'
-      isUpper = true;
-      return 2;
-    }
     if (c == 0xD0) {
+      if ((next >= 0x90 && next <= 0xAF) || next == 0x81) { // 'А' .. 'Я', 'Ё'
+        isUpper = true;
+        return 2;
+      }
       if (next >= 0xB0 && next <= 0xBF) { // 'а' .. 'п'
         isUpper = false;
         return 2;
@@ -179,6 +181,10 @@ void ScanDocs::appendLowerLetter (const uint8_t *&p, const uint8_t *end, std::st
       }
     }
   }
+
+  // Защита от бесконечного цикла: если байт не распознан, продвигаем указатель
+  word.push_back (static_cast<char> (c));
+  ++p;
 }
 
 // Потоковый разбор слова по виртуальной памяти

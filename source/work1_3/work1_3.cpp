@@ -1,7 +1,9 @@
 
+#include "work1_3.h"
+
+#include <algorithm>
 #include <iostream>
 #include <vector>
-#include <algorithm>
 
 // --- Задание 3.a: Проверка на простоту и возведение простых в квадрат ---
 bool isPrime (int n) {

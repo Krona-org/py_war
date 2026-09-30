@@ -1,0 +1,45 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "CMake: Build Debug",
+      "type": "shell",
+      "command": "cmake",
+      "args": ["--build", "--preset", "debug"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "options": {
+        "env": {
+          "PATH": "D:\\DeveloperSettings\\MSYS2\\mingw64\\bin;${env:PATH}"
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CMake: Configure Debug",
+      "type": "shell",
+      "command": "cmake",
+      "args": ["--preset", "debug"],
+      "options": {
+        "env": {
+          "PATH": "D:\\DeveloperSettings\\MSYS2\\mingw64\\bin;${env:PATH}"
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Запуск lab1 (в терминале)",
+      "type": "shell",
+      "command": "${workspaceFolder}/build_debug/lab1.exe",
+      "options": {
+        "env": {
+          "PATH": "D:\\DeveloperSettings\\MSYS2\\mingw64\\bin;${env:PATH}"
+        }
+      },
+      "dependsOn": ["CMake: Build Debug"],
+      "problemMatcher": []
+    }
+  ]
+}

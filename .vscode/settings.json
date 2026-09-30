@@ -1,14 +1,142 @@
 {
+  "clangd.path": "C:/Program Files/LLVM/bin/clangd.exe",
   "clangd.arguments": [
-    "--query-driver=D:/DeveloperSettings/MSYS2/mingw64/bin/g++.exe,D:/DeveloperSettings/MSYS2/mingw64/bin/gcc.exe,g++,gcc"
+    "--query-driver=D:/DeveloperSettings/MSYS2/mingw64/bin/g++.exe,D:/DeveloperSettings/MSYS2/mingw64/bin/gcc.exe,g++,gcc",
+    "--compile-commands-dir=${workspaceFolder}/build_debug",
+    "--background-index",
+    "--clang-tidy",
+    "--header-insertion=iwyu"
   ],
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "C_Cpp.default.debuggerPath": "D:/DeveloperSettings/MSYS2/mingw64/bin/gdb.exe",
+  "cmake.debugConfig": {
+    "miDebuggerPath": "D:/DeveloperSettings/MSYS2/mingw64/bin/gdb.exe"
+  },
   "editor.formatOnSave": true,
   "editor.inlineSuggest.enabled": true,
+  "editor.inlayHints.enabled": "on",
   "[cpp]": {
-    "editor.defaultFormatter": "xaver.clang-format"
+    "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
+    "editor.inlayHints.enabled": "on"
   },
   "[c]": {
-    "editor.defaultFormatter": "xaver.clang-format"
+    "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
+    "editor.inlayHints.enabled": "on"
   },
-  "clang-format.executable": "D:/DeveloperSettings/AndroidSdk/ndk/29.0.13599879/toolchains/llvm/prebuilt/windows-x86_64/bin/clang-format.exe"
+  "clang-format.executable": "C:/Program Files/LLVM/bin/clang-format.exe",
+  "terminal.integrated.env.windows": {
+    "PATH": "D:\\DeveloperSettings\\MSYS2\\mingw64\\bin;${env:PATH}"
+  },
+  "cmake.cmakePath": "D:/DeveloperSettings/CMake/bin/cmake.exe",
+  "cmake.environment": {
+    "PATH": "D:/DeveloperSettings/MSYS2/mingw64/bin;${env:PATH}"
+  },
+  "editor.tokenColorCustomizations": {
+    "comments": "#4d6b5b",
+    "strings": "#e5c890",
+    "numbers": "#7dcfff",
+    "keywords": "#7aa2f7",
+    "types": "#52b788",
+    "functions": "#74c69d",
+    "variables": "#e2e8f0",
+    "textMateRules": [
+      {
+        "name": "Comments in soft italic pine",
+        "scope": ["comment", "punctuation.definition.comment"],
+        "settings": {
+          "foreground": "#4d6b5b",
+          "fontStyle": "italic"
+        }
+      },
+      {
+        "name": "Keywords & Flow - cool italic sky",
+        "scope": [
+          "keyword",
+          "keyword.control",
+          "storage.type",
+          "storage.modifier"
+        ],
+        "settings": {
+          "foreground": "#7aa2f7",
+          "fontStyle": "italic"
+        }
+      },
+      {
+        "name": "Preprocessor Directives (#include, #define) - frost cyan italic",
+        "scope": [
+          "keyword.control.directive",
+          "keyword.control.directive.include",
+          "punctuation.definition.directive"
+        ],
+        "settings": {
+          "foreground": "#4ecdc4",
+          "fontStyle": "italic"
+        }
+      },
+      {
+        "name": "Include headers (<iostream>, \"file.h\") - warm soft champagne",
+        "scope": [
+          "string.quoted.other.lt-gt.include",
+          "string.quoted.double.include"
+        ],
+        "settings": {
+          "foreground": "#e5c890",
+          "fontStyle": "italic"
+        }
+      },
+      {
+        "name": "Classes & Structs - royal emerald velvet (clean, no bold)",
+        "scope": [
+          "entity.name.type.class",
+          "entity.name.type.struct",
+          "entity.name.class",
+          "entity.name.type"
+        ],
+        "settings": {
+          "foreground": "#52b788",
+          "fontStyle": ""
+        }
+      },
+      {
+        "name": "Functions & Methods - rich malachite green",
+        "scope": ["entity.name.function", "support.function"],
+        "settings": {
+          "foreground": "#74c69d",
+          "fontStyle": ""
+        }
+      },
+      {
+        "name": "Constants & Macros - luminous mint",
+        "scope": ["constant.other.macro", "constant.language"],
+        "settings": {
+          "foreground": "#80eec0",
+          "fontStyle": ""
+        }
+      },
+      {
+        "name": "Strings - warm champagne",
+        "scope": ["string.quoted"],
+        "settings": {
+          "foreground": "#e5c890"
+        }
+      }
+    ]
+  },
+  "editor.semanticTokenColorCustomizations": {
+    "enabled": true,
+    "rules": {
+      "class": { "foreground": "#52b788" },
+      "struct": { "foreground": "#52b788" },
+      "enum": { "foreground": "#40916c" },
+      "type": { "foreground": "#52b788" },
+      "function": { "foreground": "#74c69d" },
+      "method": { "foreground": "#74c69d" },
+      "parameter": { "foreground": "#95d5b2", "italic": true },
+      "variable": { "foreground": "#e2e8f0" },
+      "property": { "foreground": "#7dd3fc" },
+      "macro": { "foreground": "#4ecdc4" },
+      "namespace": { "foreground": "#e5c890", "italic": true },
+      "keyword": { "foreground": "#7aa2f7", "italic": true }
+    }
+  }
 }

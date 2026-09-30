@@ -7,11 +7,15 @@
             "description": "Build dcseditor with Ninja and MinGW into ${sourceDir}/build_debug",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build_debug",
+            "environment": {
+                "PATH": "D:/DeveloperSettings/MSYS2/mingw64/bin;$penv{PATH}"
+            },
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-                "CMAKE_CXX_COMPILER": "g++",
-                "CMAKE_C_COMPILER": "gcc"
+                "CMAKE_CXX_COMPILER": "D:/DeveloperSettings/MSYS2/mingw64/bin/g++.exe",
+                "CMAKE_C_COMPILER": "D:/DeveloperSettings/MSYS2/mingw64/bin/gcc.exe",
+                "CMAKE_MAKE_PROGRAM": "D:/DeveloperSettings/MSYS2/mingw64/bin/ninja.exe"
             }
         },
         {
@@ -20,11 +24,15 @@
             "description": "Build dcseditor with Ninja and MinGW into ${sourceDir}/build_release",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build_release",
+            "environment": {
+                "PATH": "D:/DeveloperSettings/MSYS2/mingw64/bin;$penv{PATH}"
+            },
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-                "CMAKE_CXX_COMPILER": "g++",
-                "CMAKE_C_COMPILER": "gcc"
+                "CMAKE_CXX_COMPILER": "D:/DeveloperSettings/MSYS2/mingw64/bin/g++.exe",
+                "CMAKE_C_COMPILER": "D:/DeveloperSettings/MSYS2/mingw64/bin/gcc.exe",
+                "CMAKE_MAKE_PROGRAM": "D:/DeveloperSettings/MSYS2/mingw64/bin/ninja.exe"
             }
         }
     ],

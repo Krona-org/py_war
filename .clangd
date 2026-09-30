@@ -5,3 +5,16 @@ CompileFlags:
 
 Diagnostics:
   UnusedIncludes: None
+
+Hover:
+  ShowAKA: No
+
+Documentation:
+  CommentFormat: Doxygen
+
+InlayHints:
+  Enabled: Yes
+  DeducedTypes: Yes
+  ParameterNames: Yes
+  Designators: Yes
+  TypeNameLimit: 0

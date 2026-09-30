@@ -1,225 +1,409 @@
 #include "scandocs.h"
 
+#include <Windows.h>
 #include <algorithm>
 #include <filesystem>
-#include <fstream>
-#include <iostream>
 #include <string_view>
-#include <unordered_set>
+#include <unordered_map>
 #include <vector>
 
 namespace core {
 
 ScanDocs::ScanDocs (const std::filesystem::path &path) {
-  buffer_words_ = readFile (path);
-  if (buffer_words_.empty ())
-    return;
-
-  size_ = buffer_words_.size ();
-
-  toLowerCaseInPlace (buffer_words_);
-
-  words_ = extractWordsVec (buffer_words_);
-
-  frequency_ = extractFrequency (words_);
-
-  uniqueWords_.reserve (frequency_.size ());
-  for (const auto &item : frequency_) {
-    uniqueWords_.emplace_back (item.first);
+  if (loadFile (path)) {
+    processWordsStreaming ();
   }
 }
 
-ScanDocs::~ScanDocs () = default;
+ScanDocs::~ScanDocs () { cleanupMapping (); }
 
-// ---Геттеры---
-const std::vector<std::string_view> &ScanDocs::getAllWords () const { return words_; }
-
-const std::vector<std::string_view> &ScanDocs::getUniqueWords () const { return uniqueWords_; }
-
-const std::vector<std::pair<std::string_view, uint32_t>> &ScanDocs::getFrequency () const {
-  return frequency_;
-}
-//---
-
-// ---Вспомогательные методы---
-std::string ScanDocs::readFile (const std::filesystem::path &path) {
-  std::ifstream file (path, std::ios::binary | std::ios::ate);
-
-  if (!file.is_open ())
-    return {};
-
-  const auto file_size = file.tellg ();
-  file.seekg (0, std::ios::beg);
-
-  std::string buffer (file_size, '\0');
-  file.read (buffer.data (), file_size);
-
-  return buffer;
+ScanDocs::ScanDocs (ScanDocs &&other) noexcept
+    : fileHandle_ (other.fileHandle_)
+    , mappingHandle_ (other.mappingHandle_)
+    , mappedData_ (other.mappedData_)
+    , fileSize_ (other.fileSize_)
+    , isLoaded_ (other.isLoaded_)
+    , normalizedStorage_ (std::move (other.normalizedStorage_))
+    , words_ (std::move (other.words_))
+    , uniqueWords_ (std::move (other.uniqueWords_))
+    , frequency_ (std::move (other.frequency_))
+    , wordIndex_ (std::move (other.wordIndex_)) {
+  other.fileHandle_ = nullptr;
+  other.mappingHandle_ = nullptr;
+  other.mappedData_ = nullptr;
+  other.fileSize_ = 0;
+  other.isLoaded_ = false;
 }
 
-std::vector<std::string_view> ScanDocs::extractWordsSet (const std::vector<std::string_view> &words) {
-  std::unordered_set<std::string_view> uWords (words.begin (), words.end ());
-  std::vector<std::string_view> v_uWords (uWords.begin (), uWords.end ());
+ScanDocs &ScanDocs::operator= (ScanDocs &&other) noexcept {
+  if (this != &other) {
+    cleanupMapping ();
 
-  return v_uWords;
-}
-std::vector<std::string_view> ScanDocs::extractWordsVec (std::string_view buffer) {
-  std::vector<std::string_view> words;
+    fileHandle_ = other.fileHandle_;
+    mappingHandle_ = other.mappingHandle_;
+    mappedData_ = other.mappedData_;
+    fileSize_ = other.fileSize_;
+    isLoaded_ = other.isLoaded_;
 
-  size_t start = 0;
-  bool in_word = false;
-  const size_t len = buffer.size ();
-  words.reserve (len / 6);
-  const auto *p = reinterpret_cast<const uint8_t *> (buffer.data ());
+    normalizedStorage_ = std::move (other.normalizedStorage_);
+    words_ = std::move (other.words_);
+    uniqueWords_ = std::move (other.uniqueWords_);
+    frequency_ = std::move (other.frequency_);
+    wordIndex_ = std::move (other.wordIndex_);
 
-  for (size_t i = 0; i < len;) {
-    size_t char_len = getLetterLength (p + i, len - i);
-    if (char_len > 0) {
-      if (!in_word) {
-        start = i;
-        in_word = true;
-      }
-      i += char_len; // перешагиваем на следующий символ (1 или 2 байта)
-    } else {
-      if (in_word) {
-        words.emplace_back (buffer.substr (start, i - start));
-        in_word = false;
-      }
-      ++i;
-    }
+    other.fileHandle_ = nullptr;
+    other.mappingHandle_ = nullptr;
+    other.mappedData_ = nullptr;
+    other.fileSize_ = 0;
+    other.isLoaded_ = false;
   }
-  if (in_word) {
-    words.emplace_back (buffer.substr (start, len - start));
-  }
-  return words;
+  return *this;
 }
 
-void ScanDocs::toLowerCaseInPlace (std::string &buffer) {
-  auto *p = reinterpret_cast<uint8_t *> (buffer.data ());
-  const size_t len = buffer.size ();
+bool ScanDocs::isLoaded () const noexcept { return isLoaded_; }
 
-  for (size_t i = 0; i < len; ++i) {
-    if (p[i] >= 'A' && p[i] <= 'Z') {
-      p[i] |= 0x20; // += 32
+// ---Геттеры данных---
+const std::vector<std::string_view> &ScanDocs::getAllWords () const noexcept { return words_; }
 
-    } else if (p[i] == 0xD0 && i + 1 < len) {
-      uint8_t next = p[i + 1];
+const std::vector<std::string_view> &ScanDocs::getUniqueWords () const noexcept { return uniqueWords_; }
 
-      if (next >= 0x90 && next <= 0x9F) {
-        p[i + 1] += 0x20;
-        ++i;
-      } else if (next >= 0xA0 && next <= 0xAF) {
-        p[i] = 0xD1;
-        p[i + 1] -= 0x20;
-        ++i;
-      } else if (next == 0x81) {
-        p[i] = 0xD1;
-        p[i + 1] = 0x91;
-        ++i;
-      }
-    }
+const ScanDocs::WordFrequency &ScanDocs::getFrequency () const noexcept { return frequency_; }
+
+const ScanDocs::WordIndex &ScanDocs::getWordIndex () const {
+  if (wordIndex_.empty () && !words_.empty ()) {
+    wordIndex_ = buildWordIndex ();
   }
+  return wordIndex_;
 }
 
-bool ScanDocs::isWordChar (uint8_t c) { return (c >= 128) || (c >= 'a' && c <= 'z'); }
-
-std::vector<std::pair<std::string_view, uint32_t>>
-ScanDocs::extractFrequency (const std::vector<std::string_view> &words) {
-  if (words.empty ())
-    return {};
-
-  std::vector<std::string_view> sortedWords = words;
-  std::sort (sortedWords.begin (), sortedWords.end ());
-
-  std::vector<std::pair<std::string_view, uint32_t>> freq;
-  freq.reserve (sortedWords.size () / 6);
-  freq.push_back ({sortedWords[0], 1});
-
-  for (size_t i = 1; i < sortedWords.size (); ++i) {
-    if (sortedWords[i] == freq.back ().first)
-      freq.back ().second++;
-    else
-      freq.push_back ({sortedWords[i], 1});
+// Быстрое определение длины буквы и регистра (ASCII + UTF-8 русский)
+size_t ScanDocs::getLetterInfo (const uint8_t *p, const uint8_t *end, bool &isUpper) {
+  if (p >= end) {
+    return 0;
   }
 
-  std::sort (freq.begin (), freq.end (), [] (const auto &a, const auto &b) {
-    if (a.second != b.second)
-      return a.second > b.second;
-    return a.first > b.first;
-  });
+  uint8_t c = *p; ///< Текущий байт
 
-  return freq;
-}
-
-size_t ScanDocs::getLetterLength (const uint8_t *p, size_t remaining) {
-  // английская буква (a-z) — 1 байт
-  if (*p >= 'a' && *p <= 'z') {
+  // Английские буквы a-z / A-Z
+  if (c >= 'a' && c <= 'z') {
+    isUpper = false;
     return 1;
   }
-  // русская строчная буква в UTF-8 — строго 2 байта
-  if (remaining >= 2) {
-    if (*p == 0xD0 && p[1] >= 0xB0 && p[1] <= 0xBF) {
-      return 2; // 'а' .. 'п'
+  if (c >= 'A' && c <= 'Z') {
+    isUpper = true;
+    return 1;
+  }
+
+  /**
+   * @brief Проверка на русскую букву в UTF-8 (2 байта)
+   * @param c - это проверка первого байта, к какому языку относится буква
+   * @param next - это проверка второго байта на то, какая это буква
+   * @return размер буквы
+   */
+  if (p + 1 < end) {
+    uint8_t next = p[1]; /// Следующий байт
+
+    if ((next >= 0x90 && next <= 0xAF) || next == 0x81) { // 'А' .. 'Я', 'Ё'
+      isUpper = true;
+      return 2;
     }
-    if (*p == 0xD1 && ((p[1] >= 0x80 && p[1] <= 0x8F) || p[1] == 0x91)) {
-      return 2; // 'р' .. 'я' или 'ё'
+    if (c == 0xD0) {
+      if (next >= 0xB0 && next <= 0xBF) { // 'а' .. 'п'
+        isUpper = false;
+        return 2;
+      }
+    } else if (c == 0xD1) {
+      if ((next >= 0x80 && next <= 0x8F) || next == 0x91) { // 'р' .. 'я', 'ё'
+        isUpper = false;
+        return 2;
+      }
     }
   }
+
   return 0;
 }
 
-std::vector<std::pair<std::string_view, std::vector<uint32_t>>> ScanDocs::buildWordIndex () const {
-  if (words_.empty ())
-    return {};
-
-  // Пары: (слово, индекс в тексте начиная с 0)
-  std::vector<std::pair<std::string_view, uint32_t>> wordPositions;
-  wordPositions.reserve (words_.size ());
-
-  for (size_t i = 0; i < words_.size (); ++i) {
-    wordPositions.emplace_back (words_[i], static_cast<uint32_t> (i));
+// Приведение символа к нижнему регистру и добавление в строку
+void ScanDocs::appendLowerLetter (const uint8_t *&p, const uint8_t *end, std::string &word) {
+  if (p >= end) {
+    return;
   }
 
-  // Сортируем по слову, а при равенстве по возрастанию позиции
-  std::sort (wordPositions.begin (), wordPositions.end (), [] (const auto &a, const auto &b) {
-    if (a.first != b.first)
-      return a.first < b.first;
-    return a.second < b.second;
-  });
+  uint8_t c = *p; /// Текущий байт
 
-  std::vector<std::pair<std::string_view, std::vector<uint32_t>>> index;
-  index.reserve (uniqueWords_.size ());
+  if (c >= 'a' && c <= 'z') {
+    word.push_back (static_cast<char> (c)); /// Если буква в нижнем регистре то сразу добавляем ее в строку
+    ++p;                                    /// Переходим к следующей букве
+    return;
+  }
+  if (c >= 'A' && c <= 'Z') {
+    word.push_back (static_cast<char> (
+        c | 0x20)); /// Если буква в верхнем регистре то приводим ее к нижниму регистру, через побитовое или
+    ++p;            /// Переходим к следующей букве
+    return;
+  }
 
-  for (const auto &[word, pos] : wordPositions) {
-    if (index.empty () || index.back ().first != word) {
-      index.emplace_back (word, std::vector<uint32_t> {pos});
+  if (p + 1 < end) {
+    uint8_t next = p[1];
+    if (c == 0xD0) {
+      if (next >= 0xB0 && next <= 0xBF) { // 'а' .. 'п'
+        word.push_back (static_cast<char> (c));
+        word.push_back (static_cast<char> (next));
+        p += 2;
+        return;
+      }
+      if (next >= 0x90 && next <= 0x9F) { // 'А' .. 'П' -> 'а' .. 'п'
+        word.push_back (static_cast<char> (c));
+        word.push_back (static_cast<char> (next + 0x20));
+        p += 2;
+        return;
+      }
+      if (next >= 0xA0 && next <= 0xAF) { // 'Р' .. 'Я' -> 'р' .. 'я'
+        word.push_back (static_cast<char> (0xD1));
+        word.push_back (static_cast<char> (next - 0x20));
+        p += 2;
+        return;
+      }
+      if (next == 0x81) { // 'Ё' -> 'ё'
+        word.push_back (static_cast<char> (0xD1));
+        word.push_back (static_cast<char> (0x91));
+        p += 2;
+        return;
+      }
+    } else if (c == 0xD1) {
+      if ((next >= 0x80 && next <= 0x8F) || next == 0x91) { // 'р' .. 'я', 'ё'
+        word.push_back (static_cast<char> (c));
+        word.push_back (static_cast<char> (next));
+        p += 2;
+        return;
+      }
+    }
+  }
+}
+
+// Потоковый разбор слова по виртуальной памяти
+void ScanDocs::processWordsStreaming () {
+  if (!mappedData_ || fileSize_ == 0) {
+    return;
+  }
+
+  std::unordered_map<std::string_view, uint32_t> freqMap; ///< Хэш-таблица для подсчета частоты слов
+  freqMap.reserve (65536);
+
+  words_.clear ();
+  words_.reserve (fileSize_ / 6);
+  normalizedStorage_.clear ();
+  wordIndex_.clear ();
+
+  /// Смотрим на память файла так, будто это массив байтов
+  const auto *p =
+      reinterpret_cast<const uint8_t *> (mappedData_); ///< указатель на первый байт отображаемой памяти
+  const auto *end = p + fileSize_;                     ///< указатель на конец отображаемой памяти
+
+  std::string tempWord;  ///< Временная строка для хранения слова
+  tempWord.reserve (64); ///< Резервируем память для слова
+
+  /// Цикл чтения проходит по всем байтам файла, пока не достигнет конца
+  while (p < end) {
+    bool isUpper = false; ///< Флаг регистра
+    size_t len = 0;       ///< Размер буквы в байтах
+
+    /// Поиск начала слова
+    while (p < end && (len = getLetterInfo (p, end, isUpper)) == 0)
+      ++p; ///< Переходим к следующему байту
+
+    /// Если дошли до конца файла то выходим из цикла
+    if (p >= end)
+      break;
+
+    const uint8_t *wordStart = p; /// Запоминаем указатель на начало слова
+    bool hasUpper = isUpper;      /// Флаг регистра для всего слова
+    p += len;                     /// Сдвигаем указатель на следующую букву
+
+    /// Итерируемся до конца слова, запоминая регистр
+    while (p < end && (len = getLetterInfo (p, end, isUpper)) > 0) {
+      hasUpper |= isUpper;
+      p += len;
+    }
+    const uint8_t *wordEnd = p; ///< Указатель на конец слова
+
+    std::string_view wordView; ///< Указатель на слово в памяти
+    /// Если в слове нет букв в верхнем регистре то сразу записываем слово в string_view
+    if (!hasUpper) {
+      /// Первый аргуемнт указатель на начало слова, второй сколько байт он занимает
+      wordView = std::string_view (reinterpret_cast<const char *> (wordStart), wordEnd - wordStart);
     } else {
-      index.back ().second.push_back (pos);
+      tempWord.clear ();              ///< Очищаем временное слово
+      const uint8_t *cur = wordStart; ///< Указатель на начало слова
+
+      /// Итерируемся до конца слова, приводя буквы к нижнему регистру
+      while (cur < wordEnd) {
+        appendLowerLetter (cur, wordEnd, tempWord); ///< Метод приведения к нижнему регистру
+      }
+
+      wordView = tempWord; ///< Привязываем string_view к буферу временной строки
+    }
+
+    /// Поиск слова в хэш таблице
+    auto it = freqMap.find (wordView);
+
+    /// Если слово не найдено, то добавляем его в таблицу
+    if (it == freqMap.end ()) {
+      /// Если не было больших букв то берем слово из памяти
+      if (!hasUpper) {
+        freqMap.emplace (wordView, 1); ///< Добавляем слово в таблицу
+        words_.push_back (wordView);   ///< Добавляем слово в список слов
+      } else {
+        normalizedStorage_.push_back (std::move (tempWord)); ///< Перемещаем слово в хранилище
+        std::string_view sv = normalizedStorage_.back ();    ///< Создаем string_view на сохраненную строку
+        freqMap.emplace (sv, 1);                             ///< Добавляем слово в таблицу частот
+        words_.push_back (sv);                               ///< Добавляем слово в список слов
+      }
+    } else {
+      it->second++;                 ///< Увеличиваем счетчик частоты
+      words_.push_back (it->first); ///< Добавляем уже сохраненное слово в список слов
     }
   }
 
-  std::sort (index.begin (), index.end (), [] (const auto &a, const auto &b) {
-    if (a.second.size () != b.second.size ())
-      return a.second.size () > b.second.size (); // по убыванию количества
-    return a.first < b.first;                     // при равенстве — по алфавиту
+  /// Очищаем частотный список
+  frequency_.clear ();
+  frequency_.reserve (freqMap.size ());
+
+  /// Заполняем частотный список
+  for (const auto &[word, count] : freqMap) {
+    frequency_.emplace_back (word, count);
+  }
+
+  /// Сортируем частотный список сначала по убыванию частоты, затем по алфавиту
+  std::sort (frequency_.begin (), frequency_.end (), [] (const auto &a, const auto &b) {
+    if (a.second != b.second) {
+      return a.second > b.second; ///< У кого частота больше, тот выше
+    }
+    return a.first < b.first; ///< Если частоты равна, сортируем по алфавиту
   });
+
+  /// Заполняем список уникальных слов в порядке популярности
+  uniqueWords_.clear ();
+  uniqueWords_.reserve (frequency_.size ());
+  for (const auto &item : frequency_) {
+    uniqueWords_.push_back (item.first);
+  }
+}
+
+/**
+ * @brief Построение индекса слов
+ * @return Индекс позиций всех слов
+ */
+ScanDocs::WordIndex ScanDocs::buildWordIndex () const {
+  if (words_.empty ()) {
+    return {};
+  }
+
+  /// Хэш таблица индекса слов, арг 1 слово, арг 2 позици слова в тексте
+  std::unordered_map<std::string_view, std::vector<uint32_t>> indexMap;
+  indexMap.reserve (uniqueWords_.size ()); // Резервируем по числу уникальных слов
+
+  /// Проходим по всем словам и добавляем в таблицу только уникальные слова и уникальную позицию
+  for (uint32_t i = 0; i < words_.size (); ++i) {
+    indexMap[words_[i]].push_back (i);
+  }
+
+  WordIndex index; ///< Индекс слов
+  index.reserve (indexMap.size ());
+
+  /// Перемещаем элементы из хэш таблицы в вектор пар, чтобы потом отсортировать
+  for (auto &[word, positions] : indexMap) {
+    index.emplace_back (word, std::move (positions));
+  }
+
+  /// Сортируем по убыванию количества вхождений слова в тексте
+  std::sort (index.begin (), index.end (), [] (const auto &a, const auto &b) {
+    if (a.second.size () != b.second.size ()) {
+      return a.second.size () > b.second.size (); /// У кого позиций больше, тот выше
+    }
+    return a.first < b.first; ///< Если позиций одинаково, сортируем по алфавиту
+  });
+
   return index;
 }
 
-void ScanDocs::printWordIndex (std::ostream &out, size_t limit) const {
-  auto index = buildWordIndex ();
-  size_t count = std::min (limit, index.size ());
-  for (size_t i = 0; i < count; ++i) {
-    const auto &[word, positions] = index[i];
-    out << "«" << word << " – ";
-    for (size_t j = 0; j < positions.size (); ++j) {
-      out << positions[j];
-      if (j + 1 < positions.size ()) {
-        out << ", ";
-      }
-    }
-    out << "»\n";
+void ScanDocs::cleanupMapping () {
+  if (mappedData_) {
+    UnmapViewOfFile (mappedData_);
+    mappedData_ = nullptr;
   }
+  if (mappingHandle_) {
+    CloseHandle (static_cast<HANDLE> (mappingHandle_));
+    mappingHandle_ = nullptr;
+  }
+  if (fileHandle_ && fileHandle_ != INVALID_HANDLE_VALUE) {
+    CloseHandle (static_cast<HANDLE> (fileHandle_));
+    fileHandle_ = nullptr;
+  }
+  fileSize_ = 0;
+  isLoaded_ = false;
+}
+
+bool ScanDocs::loadFile (const std::filesystem::path &path) {
+  std::error_code ec;                                     ///< Переменная для записи ошибки
+  uintmax_t size = std::filesystem::file_size (path, ec); ///< Получаем размер файла
+
+  /// Если возникла ошибка то возвращаем false
+  if (ec)
+    return false;
+
+  /// Если файл пустой то устанавливаем флаг загрузки и возвращаем true
+  if (size == 0) {
+    fileSize_ = 0;
+    isLoaded_ = true;
+    return true;
+  }
+
+  fileSize_ = static_cast<size_t> (size); ///< Сохраняем размер файла
+
+  HANDLE hFile = CreateFileW (path.c_str (),   // Имя файла
+                              GENERIC_READ,    // Режим доступа (чтение)
+                              FILE_SHARE_READ, // Совместный доступ (разрешаем читать)
+                              nullptr,         // Атрибуты безопасности
+                              OPEN_EXISTING,   // Открыть только существующий файл
+                              FILE_ATTRIBUTE_NORMAL |
+                                  FILE_FLAG_SEQUENTIAL_SCAN, // Флаги и оптимизация (нет спец свойств, читаем
+                                                             // последовательно от начала и до конца)
+                              nullptr);                      // Шаблонный файл
+
+  /// Если файл не открыт, то возвращаем false
+  if (hFile == INVALID_HANDLE_VALUE) {
+    return false;
+  }
+
+  /// Создаем отобрадение файла в память
+  HANDLE hMapping = CreateFileMappingW (hFile,         // Дескриптор открытого файла
+                                        nullptr,       // Атрибуты безопасности
+                                        PAGE_READONLY, // Защита страниц памяти
+                                        0,             // 0 и 0 означают
+                                        0,             // отображение файла целиком
+                                        nullptr);      // Указатель на файл
+  /// Если отображение не удалось, то закрываем файл и возвращаем false
+  if (!hMapping) {
+    CloseHandle (hFile);
+    return false;
+  }
+
+  /// Получаем указатель на отображенную область памяти
+  const char *pData = static_cast<const char *> (MapViewOfFile (hMapping, FILE_MAP_READ, 0, 0, 0));
+  /// Если отображение не удалось, то закрываем файл и отображение и возвращаем false
+  if (!pData) {
+    CloseHandle (hMapping);
+    CloseHandle (hFile);
+    return false;
+  }
+
+  fileHandle_ = hFile;       // Сохраняем дескриптор файла
+  mappingHandle_ = hMapping; // Сохраняем дескриптор отображения файла в память
+  mappedData_ = pData;       // Сохраняем указатель на отображенную область памяти
+  isLoaded_ = true;          // Устанавливаем флаг загрузки файла
+
+  return true;
 }
 
 } // namespace core

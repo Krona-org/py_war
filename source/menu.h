@@ -38,6 +38,13 @@ public:
   bool saveReportToFile (const std::string &outputPath = "report.txt", size_t topWordsLimit = 10,
                          size_t topPositionsLimit = 10);
 
+  /// @brief Сохранение отчета в файл для конкретного режима (--mode 1, 2 или 0)
+  /// @param mode 1: частота слов, 2: количество встреч и позиций слов, 0: полный отчет
+  /// @param outputPath Имя файла результата (по умолчанию "result.txt")
+  /// @param limit Количество слов для вывода (по умолчанию 10)
+  /// @return true в случае успешной записи
+  bool saveModeReport (int mode, const std::string &outputPath = "result.txt", size_t limit = 10);
+
   /// @brief Печать заголовка документа (имя файла, размер, время обработки)
   void printHeader () const;
 

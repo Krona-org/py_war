@@ -1,4 +1,5 @@
 #include "menu.h"
+#include "file_sync.h"
 
 #include <Windows.h>
 #include <commdlg.h>
@@ -138,10 +139,7 @@ bool DocumentMenu::saveReportToFile (const std::string &outputPath, size_t topWo
     return false;
   }
 
-  std::ofstream out (outputPath);
-  if (!out.is_open ()) {
-    return false;
-  }
+  std::ostringstream out;
 
   double sizeKb = static_cast<double> (scanDocs_.getFileSize ()) / 1024.0;
   double sizeMb = sizeKb / 1024.0;
@@ -188,9 +186,70 @@ bool DocumentMenu::saveReportToFile (const std::string &outputPath, size_t topWo
     }
     out << "]\n";
   }
-  out << "==================================================\n";
+  out << "==================================================";
 
-  return true;
+  return sync::FileSynchronizer::writeSynchronized (outputPath, out.str ());
+}
+
+bool DocumentMenu::saveModeReport (int mode, const std::string &outputPath, size_t limit) {
+  if (mode == 0) {
+    return saveReportToFile (outputPath, limit, limit);
+  }
+
+  if (!isLoaded ()) {
+    return false;
+  }
+
+  std::ostringstream out;
+
+  double sizeKb = static_cast<double> (scanDocs_.getFileSize ()) / 1024.0;
+  double sizeMb = sizeKb / 1024.0;
+
+  out << "Файл: " << filePath_ << "\n";
+  out << "Размер: " << scanDocs_.getFileSize () << " байт";
+  if (sizeMb >= 1.0) {
+    out << " (" << std::fixed << std::setprecision (2) << sizeMb << " МБ)";
+  } else {
+    out << " (" << std::fixed << std::setprecision (2) << sizeKb << " КБ)";
+  }
+  out << "\n";
+  out << "Время обработки: " << std::fixed << std::setprecision (2) << processingTimeMs_ << " мс\n";
+  out << "Всего слов в тексте: " << scanDocs_.getAllWords ().size () << "\n";
+  out << "Всего уникальных слов: " << scanDocs_.getUniqueWords ().size () << "\n\n";
+
+  if (mode == 1) {
+    // 1. Уникальные слова и частота
+    const auto &freq = scanDocs_.getFrequency ();
+    size_t wordsCount = std::min (limit, freq.size ());
+    out << "1. Уникальные слова (топ-" << wordsCount << " по частоте встречаемости):\n";
+    out << "Количество уникальных слов: " << scanDocs_.getUniqueWords ().size () << "\n";
+    for (size_t i = 0; i < wordsCount; ++i) {
+      out << (i + 1) << ". " << freq[i].first << " : " << freq[i].second << " вхождений\n";
+    }
+  } else if (mode == 2) {
+    // 2. Индексация позиций и количество встреч слов
+    const auto &wordIndex = scanDocs_.getWordIndex ();
+    size_t posWordsCount = std::min (limit, wordIndex.size ());
+    out << "2. Топ индексации позиций слов (топ-" << posWordsCount << "):\n";
+    for (size_t i = 0; i < posWordsCount; ++i) {
+      const auto &[word, positions] = wordIndex[i];
+      out << (i + 1) << ". \"" << word << "\" (количество встреч: " << positions.size () << "):\n   [";
+      size_t showPos = std::min<size_t> (positions.size (), 20);
+      for (size_t p = 0; p < showPos; ++p) {
+        out << positions[p];
+        if (p + 1 < showPos) {
+          out << ", ";
+        }
+      }
+      if (positions.size () > showPos) {
+        out << ", ... ещё " << (positions.size () - showPos) << " поз.";
+      }
+      out << "]\n";
+    }
+  }
+  out << "==================================================";
+
+  return sync::FileSynchronizer::writeSynchronized (outputPath, out.str ());
 }
 
 void DocumentMenu::runInteractiveMenu () {

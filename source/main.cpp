@@ -1,8 +1,70 @@
+#include "file_sync.h"
 #include "menu.h"
 
+#include <memory>
 #include <Windows.h>
 #include <iostream>
 #include <string>
+
+/// @brief Параметры командной строки
+struct CliOptions {
+  std::string filePath;
+  int mode {-1}; // 1: частота слов, 2: количество встреч и позиций, 0: полный отчет
+  std::string resultPath {"result.txt"}; // имя файла результата по умолчанию
+  bool hasMode {false};
+  bool hasResult {false};
+};
+
+/// @brief Разбор аргументов командной строки (--mode, --file, --result)
+CliOptions parseCommandLine (int argc, char *argv[]) {
+  CliOptions opts;
+
+  for (int i = 1; i < argc; ++i) {
+    std::string arg = argv[i];
+
+    if (arg == "--file" || arg == "-f") {
+      if (i + 1 < argc) {
+        opts.filePath = argv[++i];
+      }
+    } else if (arg == "--mode" || arg == "-m") {
+      if (i + 1 < argc) {
+        try {
+          opts.mode = std::stoi (argv[++i]);
+          opts.hasMode = true;
+        } catch (...) {}
+      }
+    } else if (arg == "--result" || arg == "-r") {
+      if (i + 1 < argc) {
+        opts.resultPath = argv[++i];
+        opts.hasResult = true;
+      }
+    } else if (arg == "--" && i + 1 < argc && std::string (argv[i + 1]) == "result") {
+      // Поддержка варианта с пробелом: -- result "имя_файла"
+      ++i;
+      if (i + 1 < argc) {
+        opts.resultPath = argv[++i];
+        opts.hasResult = true;
+      }
+    } else if (arg.rfind ("--file=", 0) == 0) {
+      opts.filePath = arg.substr (7);
+    } else if (arg.rfind ("--mode=", 0) == 0) {
+      try {
+        opts.mode = std::stoi (arg.substr (7));
+        opts.hasMode = true;
+      } catch (...) {}
+    } else if (arg.rfind ("--result=", 0) == 0) {
+      opts.resultPath = arg.substr (9);
+      opts.hasResult = true;
+    } else if (!opts.hasMode && (arg == "0" || arg == "1" || arg == "2")) {
+      opts.mode = std::stoi (arg);
+      opts.hasMode = true;
+    } else if (opts.filePath.empty () && arg[0] != '-') {
+      opts.filePath = arg;
+    }
+  }
+
+  return opts;
+}
 
 int main (int argc, char *argv[]) {
   // Установка кодировки UTF-8 для корректного отображения русского языка
@@ -10,78 +72,44 @@ int main (int argc, char *argv[]) {
   SetConsoleOutputCP (65001);
   std::ios::sync_with_stdio (false);
 
-  std::string filePath;
-  int mode = -1; // -1: не задан, 0: запись в файл, 1: интерактивное меню
+  CliOptions opts = parseCommandLine (argc, argv);
 
-  //  Разбор аргументов командной строки
-  if (argc >= 3) {
-    filePath = argv[1];
-    std::string modeStr = argv[2];
-    if (modeStr == "0") {
-      mode = 0;
-    } else if (modeStr == "1") {
-      mode = 1;
-    }
-  } else if (argc == 2) {
-    std::string arg1 = argv[1];
-    if (arg1 == "0" || arg1 == "1") {
-      mode = (arg1 == "0") ? 0 : 1;
-    } else {
-      filePath = arg1;
-    }
+  // Регистрируем сессию межпроцессной синхронизации для выходного файла,
+  // чтобы разделяемая память оставалась активной на протяжении всей работы параллельных процессов
+  std::unique_ptr<sync::FileSynchronizer> syncSession;
+  if (opts.hasMode || opts.hasResult) {
+    syncSession = std::make_unique<sync::FileSynchronizer> (opts.resultPath);
   }
 
-  // Если путь к файлу не был передан в аргументах, вызываем окно выбора
-  if (filePath.empty ()) {
-    filePath = app::OpenFileDialog ();
-    if (filePath.empty ()) {
+  // 1. Если путь к файлу не был передан в аргументах, вызываем окно выбора
+  if (opts.filePath.empty ()) {
+    opts.filePath = app::OpenFileDialog ();
+    if (opts.filePath.empty ()) {
       std::cout << "Файл не выбран. Завершение работы.\n";
       return 0;
     }
   }
 
-  // Загружаем и анализируем документ
-  app::DocumentMenu menu (filePath);
+  // 2. Загружаем и анализируем документ
+  app::DocumentMenu menu (opts.filePath);
   if (!menu.isLoaded ()) {
-    std::cout << "Ошибка: не удалось загрузить или отобразить файл: " << filePath << "\n";
+    std::cout << "Ошибка: не удалось загрузить или отобразить файл: " << opts.filePath << "\n";
     return 1;
   }
 
-  // Если режим не был указан в аргументах (0 или 1), запрашиваем у пользователя
-  if (mode == -1) {
-    menu.printHeader ();
-    std::cout << "Выберите режим работы программы:\n";
-    std::cout << "  1 - Показать интерактивное циклическое меню\n";
-    std::cout << "  0 - Записать отчет в файл и выйти\n";
-    std::cout << "Ваш выбор [0 или 1]: ";
-
-    std::string input;
-    if (std::getline (std::cin, input)) {
-      if (input == "0") {
-        mode = 0;
-      } else {
-        mode = 1; // по умолчанию при любом другом вводе
-      }
-    } else {
-      mode = 1;
-    }
-  }
-
-  // Выполнение выбранного режима
-  if (mode == 0) {
-    // Режим 0: запись отчета в файл (без потокового вывода на экран)
-    const std::string outputFile = "report.txt";
-    if (menu.saveReportToFile (outputFile, 10, 10)) {
-      std::cout << "Отчет успешно записан в файл: " << outputFile << "\n";
+  // 3. Если передан режим работы через аргументы (--mode 1, 2 или 0)
+  if (opts.hasMode) {
+    if (menu.saveModeReport (opts.mode, opts.resultPath, 10)) {
+      std::cout << "Результат успешно сохранен в файл: " << opts.resultPath << "\n";
       return 0;
     } else {
-      std::cerr << "Ошибка при записи отчета в файл: " << outputFile << "\n";
+      std::cerr << "Ошибка при записи результата в файл: " << opts.resultPath << "\n";
       return 1;
     }
-  } else {
-    // Запуск интерактивного циклического меню
-    menu.runInteractiveMenu ();
   }
+
+  // 4. Если режим не был передан в аргументах — запускаем интерактивное меню
+  menu.runInteractiveMenu ();
 
   return 0;
 }

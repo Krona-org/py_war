@@ -1,5 +1,6 @@
 #include "menu.h"
 #include "file_sync.h"
+#include "localization.h"
 
 #include <Windows.h>
 #include <commdlg.h>
@@ -59,30 +60,31 @@ bool DocumentMenu::loadFile (const std::string &filePath) {
 bool DocumentMenu::isLoaded () const noexcept { return scanDocs_.isLoaded (); }
 
 void DocumentMenu::printHeader () const {
-  std::cout << "\n==================================================\n";
-  std::cout << "Файл: " << filePath_ << "\n";
+  std::cout << "\n" << loc::tr ("header.divider") << "\n";
+  std::cout << loc::tr ("header.file") << filePath_ << "\n";
   if (isLoaded ()) {
     double sizeKb = static_cast<double> (scanDocs_.getFileSize ()) / 1024.0;
     double sizeMb = sizeKb / 1024.0;
-    std::cout << "Размер: " << scanDocs_.getFileSize () << " байт";
+    std::cout << loc::tr ("header.size") << scanDocs_.getFileSize () << " " << loc::tr ("header.bytes");
     if (sizeMb >= 1.0) {
-      std::cout << " (" << std::fixed << std::setprecision (2) << sizeMb << " МБ)";
+      std::cout << " (" << std::fixed << std::setprecision (2) << sizeMb << " " << loc::tr ("header.mb") << ")";
     } else {
-      std::cout << " (" << std::fixed << std::setprecision (2) << sizeKb << " КБ)";
+      std::cout << " (" << std::fixed << std::setprecision (2) << sizeKb << " " << loc::tr ("header.kb") << ")";
     }
     std::cout << "\n";
-    std::cout << "Время обработки: " << std::fixed << std::setprecision (2) << processingTimeMs_ << " мс\n";
-    std::cout << "Всего слов в тексте: " << scanDocs_.getAllWords ().size () << "\n";
-    std::cout << "Уникальных слов: " << scanDocs_.getUniqueWords ().size () << "\n";
+    std::cout << loc::tr ("header.time") << std::fixed << std::setprecision (2) << processingTimeMs_ << " "
+              << loc::tr ("header.ms") << "\n";
+    std::cout << loc::tr ("header.total_words") << scanDocs_.getAllWords ().size () << "\n";
+    std::cout << loc::tr ("header.unique_words") << scanDocs_.getUniqueWords ().size () << "\n";
   } else {
-    std::cout << "[Файл не загружен или пуст]\n";
+    std::cout << loc::tr ("header.file_empty") << "\n";
   }
-  std::cout << "==================================================\n";
+  std::cout << loc::tr ("header.divider") << "\n";
 }
 
 void DocumentMenu::showUniqueWords (size_t limit) const {
   if (!isLoaded ()) {
-    std::cout << "Файл не загружен!\n";
+    std::cout << loc::tr ("header.file_not_loaded") << "\n";
     return;
   }
 
@@ -90,33 +92,34 @@ void DocumentMenu::showUniqueWords (size_t limit) const {
   size_t totalUnique = scanDocs_.getUniqueWords ().size ();
   size_t count = std::min (limit, freq.size ());
 
-  std::cout << "\n>>> Пункт 1: Уникальные слова <<<\n";
-  std::cout << "Общее количество уникальных слов: " << totalUnique << "\n";
-  std::cout << "Топ-" << count << " наиболее часто встречающихся слов:\n";
-  std::cout << "--------------------------------------------------\n";
+  std::cout << "\n" << loc::tr ("report.section1_console") << "\n";
+  std::cout << loc::tr ("report.unique_count") << totalUnique << "\n";
+  std::cout << loc::tr ("report.top_words_console") << count << loc::tr ("report.top_words_console_suffix") << "\n";
+  std::cout << loc::tr ("header.subdivider") << "\n";
 
   for (size_t i = 0; i < count; ++i) {
-    std::cout << (i + 1) << ". " << freq[i].first << " : " << freq[i].second << " раз\n";
+    std::cout << (i + 1) << ". " << freq[i].first << " : " << freq[i].second << " " << loc::tr ("report.times") << "\n";
   }
-  std::cout << "--------------------------------------------------\n";
+  std::cout << loc::tr ("header.subdivider") << "\n";
 }
 
 void DocumentMenu::showWordPositions (size_t limit, size_t maxPositionsPerWord) const {
   if (!isLoaded ()) {
-    std::cout << "Файл не загружен!\n";
+    std::cout << loc::tr ("header.file_not_loaded") << "\n";
     return;
   }
 
   const auto &wordIndex = scanDocs_.getWordIndex ();
   size_t count = std::min (limit, wordIndex.size ());
 
-  std::cout << "\n>>> Пункт 2: Индексация позиций слов <<<\n";
-  std::cout << "Топ-" << count << " слов по частоте с их индексами позиций в тексте:\n";
-  std::cout << "--------------------------------------------------\n";
+  std::cout << "\n" << loc::tr ("report.section2_console") << "\n";
+  std::cout << loc::tr ("report.top_words_console") << count << loc::tr ("report.top_pos_console_suffix") << "\n";
+  std::cout << loc::tr ("header.subdivider") << "\n";
 
   for (size_t i = 0; i < count; ++i) {
     const auto &[word, positions] = wordIndex[i];
-    std::cout << (i + 1) << ". \"" << word << "\" (вхождений: " << positions.size () << "):\n   Позиции: [";
+    std::cout << (i + 1) << ". \"" << word << "\" (" << loc::tr ("report.occurrences") << ": " << positions.size ()
+              << "):\n   Позиции: [";
 
     size_t showCount = std::min (positions.size (), maxPositionsPerWord);
     for (size_t p = 0; p < showCount; ++p) {
@@ -126,11 +129,12 @@ void DocumentMenu::showWordPositions (size_t limit, size_t maxPositionsPerWord) 
       }
     }
     if (positions.size () > showCount) {
-      std::cout << ", ... ещё " << (positions.size () - showCount) << " поз.";
+      std::cout << loc::tr ("report.more_positions") << (positions.size () - showCount)
+                << loc::tr ("report.positions_suffix");
     }
     std::cout << "]\n\n";
   }
-  std::cout << "--------------------------------------------------\n";
+  std::cout << loc::tr ("header.subdivider") << "\n";
 }
 
 bool DocumentMenu::saveReportToFile (const std::string &outputPath, size_t topWordsLimit,
@@ -144,36 +148,36 @@ bool DocumentMenu::saveReportToFile (const std::string &outputPath, size_t topWo
   double sizeKb = static_cast<double> (scanDocs_.getFileSize ()) / 1024.0;
   double sizeMb = sizeKb / 1024.0;
 
-  out << "Файл: " << filePath_ << "\n";
-  out << "Размер: " << scanDocs_.getFileSize () << " байт";
+  out << loc::tr ("header.file") << filePath_ << "\n";
+  out << loc::tr ("header.size") << scanDocs_.getFileSize () << " " << loc::tr ("header.bytes");
   if (sizeMb >= 1.0) {
-    out << " (" << std::fixed << std::setprecision (2) << sizeMb << " МБ)";
+    out << " (" << std::fixed << std::setprecision (2) << sizeMb << " " << loc::tr ("header.mb") << ")";
   } else {
-    out << " (" << std::fixed << std::setprecision (2) << sizeKb << " КБ)";
+    out << " (" << std::fixed << std::setprecision (2) << sizeKb << " " << loc::tr ("header.kb") << ")";
   }
   out << "\n";
-  out << "Время обработки: " << std::fixed << std::setprecision (2) << processingTimeMs_ << " мс\n";
-  out << "Всего слов в тексте: " << scanDocs_.getAllWords ().size () << "\n";
-  out << "Всего уникальных слов: " << scanDocs_.getUniqueWords ().size () << "\n\n";
+  out << loc::tr ("header.time") << std::fixed << std::setprecision (2) << processingTimeMs_ << " "
+      << loc::tr ("header.ms") << "\n";
+  out << loc::tr ("header.total_words") << scanDocs_.getAllWords ().size () << "\n";
+  out << loc::tr ("header.unique_words") << scanDocs_.getUniqueWords ().size () << "\n\n";
 
   // 1. Уникальные слова
   const auto &freq = scanDocs_.getFrequency ();
   size_t wordsCount = std::min (topWordsLimit, freq.size ());
-  out << "1. Уникальные слова:\n";
-  out << "Количество уникальных слов: " << scanDocs_.getUniqueWords ().size () << "\n";
-  out << "Топ-" << wordsCount << " самых частых уникальных слов:\n";
+  out << loc::tr ("report.unique_title") << wordsCount << loc::tr ("report.unique_by_freq") << "\n";
+  out << loc::tr ("report.unique_count") << scanDocs_.getUniqueWords ().size () << "\n";
   for (size_t i = 0; i < wordsCount; ++i) {
-    out << (i + 1) << ". " << freq[i].first << " : " << freq[i].second << " вхождений\n";
+    out << (i + 1) << ". " << freq[i].first << " : " << freq[i].second << " " << loc::tr ("report.occurrences") << "\n";
   }
   out << "\n";
 
   // 2. Индексация позиций слов
   const auto &wordIndex = scanDocs_.getWordIndex ();
   size_t posWordsCount = std::min (topPositionsLimit, wordIndex.size ());
-  out << "2. Топ индексации позиций слов (топ-" << posWordsCount << "):\n";
+  out << loc::tr ("report.positions_title") << posWordsCount << "):\n";
   for (size_t i = 0; i < posWordsCount; ++i) {
     const auto &[word, positions] = wordIndex[i];
-    out << (i + 1) << ". \"" << word << "\" (всего " << positions.size () << " позиций):\n   [";
+    out << (i + 1) << ". \"" << word << "\" (" << loc::tr ("report.positions_prefix") << positions.size () << "):\n   [";
     size_t showPos = std::min<size_t> (positions.size (), 20);
     for (size_t p = 0; p < showPos; ++p) {
       out << positions[p];
@@ -182,11 +186,12 @@ bool DocumentMenu::saveReportToFile (const std::string &outputPath, size_t topWo
       }
     }
     if (positions.size () > showPos) {
-      out << ", ... ещё " << (positions.size () - showPos) << " поз.";
+      out << loc::tr ("report.more_positions") << (positions.size () - showPos)
+          << loc::tr ("report.positions_suffix");
     }
     out << "]\n";
   }
-  out << "==================================================";
+  out << loc::tr ("header.divider");
 
   return sync::FileSynchronizer::writeSynchronized (outputPath, out.str ());
 }
@@ -205,35 +210,36 @@ bool DocumentMenu::saveModeReport (int mode, const std::string &outputPath, size
   double sizeKb = static_cast<double> (scanDocs_.getFileSize ()) / 1024.0;
   double sizeMb = sizeKb / 1024.0;
 
-  out << "Файл: " << filePath_ << "\n";
-  out << "Размер: " << scanDocs_.getFileSize () << " байт";
+  out << loc::tr ("header.file") << filePath_ << "\n";
+  out << loc::tr ("header.size") << scanDocs_.getFileSize () << " " << loc::tr ("header.bytes");
   if (sizeMb >= 1.0) {
-    out << " (" << std::fixed << std::setprecision (2) << sizeMb << " МБ)";
+    out << " (" << std::fixed << std::setprecision (2) << sizeMb << " " << loc::tr ("header.mb") << ")";
   } else {
-    out << " (" << std::fixed << std::setprecision (2) << sizeKb << " КБ)";
+    out << " (" << std::fixed << std::setprecision (2) << sizeKb << " " << loc::tr ("header.kb") << ")";
   }
   out << "\n";
-  out << "Время обработки: " << std::fixed << std::setprecision (2) << processingTimeMs_ << " мс\n";
-  out << "Всего слов в тексте: " << scanDocs_.getAllWords ().size () << "\n";
-  out << "Всего уникальных слов: " << scanDocs_.getUniqueWords ().size () << "\n\n";
+  out << loc::tr ("header.time") << std::fixed << std::setprecision (2) << processingTimeMs_ << " "
+      << loc::tr ("header.ms") << "\n";
+  out << loc::tr ("header.total_words") << scanDocs_.getAllWords ().size () << "\n";
+  out << loc::tr ("header.unique_words") << scanDocs_.getUniqueWords ().size () << "\n\n";
 
   if (mode == 1) {
     // 1. Уникальные слова и частота
     const auto &freq = scanDocs_.getFrequency ();
     size_t wordsCount = std::min (limit, freq.size ());
-    out << "1. Уникальные слова (топ-" << wordsCount << " по частоте встречаемости):\n";
-    out << "Количество уникальных слов: " << scanDocs_.getUniqueWords ().size () << "\n";
+    out << loc::tr ("report.unique_title") << wordsCount << loc::tr ("report.unique_by_freq") << "\n";
+    out << loc::tr ("report.unique_count") << scanDocs_.getUniqueWords ().size () << "\n";
     for (size_t i = 0; i < wordsCount; ++i) {
-      out << (i + 1) << ". " << freq[i].first << " : " << freq[i].second << " вхождений\n";
+      out << (i + 1) << ". " << freq[i].first << " : " << freq[i].second << " " << loc::tr ("report.occurrences") << "\n";
     }
   } else if (mode == 2) {
     // 2. Индексация позиций и количество встреч слов
     const auto &wordIndex = scanDocs_.getWordIndex ();
     size_t posWordsCount = std::min (limit, wordIndex.size ());
-    out << "2. Топ индексации позиций слов (топ-" << posWordsCount << "):\n";
+    out << loc::tr ("report.positions_title") << posWordsCount << "):\n";
     for (size_t i = 0; i < posWordsCount; ++i) {
       const auto &[word, positions] = wordIndex[i];
-      out << (i + 1) << ". \"" << word << "\" (количество встреч: " << positions.size () << "):\n   [";
+      out << (i + 1) << ". \"" << word << "\" (" << loc::tr ("report.positions_prefix") << positions.size () << "):\n   [";
       size_t showPos = std::min<size_t> (positions.size (), 20);
       for (size_t p = 0; p < showPos; ++p) {
         out << positions[p];
@@ -242,26 +248,33 @@ bool DocumentMenu::saveModeReport (int mode, const std::string &outputPath, size
         }
       }
       if (positions.size () > showPos) {
-        out << ", ... ещё " << (positions.size () - showPos) << " поз.";
+        out << loc::tr ("report.more_positions") << (positions.size () - showPos)
+            << loc::tr ("report.positions_suffix");
       }
       out << "]\n";
     }
   }
-  out << "==================================================";
+  out << loc::tr ("header.divider");
 
   return sync::FileSynchronizer::writeSynchronized (outputPath, out.str ());
 }
 
 void DocumentMenu::runInteractiveMenu () {
   while (true) {
+    if (!loc::isExplicitLanguage ()) {
+      std::string kbdLang = loc::detectKeyboardLanguage ();
+      if (kbdLang != loc::getLanguage ()) {
+        loc::setLanguage (kbdLang);
+      }
+    }
     printHeader ();
-    std::cout << "МЕНЮ ДЕЙСТВИЙ:\n";
-    std::cout << "  1. Показать уникальные слова (по умолчанию топ-10)\n";
-    std::cout << "  2. Показать топ индексации позиций слов (по умолчанию топ-10)\n";
-    std::cout << "  3. Записать отчет в файл\n";
-    std::cout << "  4. Открыть другой файл\n";
-    std::cout << "  0. Выход\n";
-    std::cout << "Выберите пункт [0-4]: ";
+    std::cout << loc::tr ("menu.title") << "\n";
+    std::cout << loc::tr ("menu.item1") << "\n";
+    std::cout << loc::tr ("menu.item2") << "\n";
+    std::cout << loc::tr ("menu.item3") << "\n";
+    std::cout << loc::tr ("menu.item4") << "\n";
+    std::cout << loc::tr ("menu.item0") << "\n";
+    std::cout << loc::tr ("menu.prompt");
 
     std::string choice;
     if (!std::getline (std::cin, choice)) {
@@ -273,10 +286,10 @@ void DocumentMenu::runInteractiveMenu () {
     }
 
     if (choice == "0") {
-      std::cout << "Завершение работы программы.\n";
+      std::cout << loc::tr ("menu.exit_message") << "\n";
       break;
     } else if (choice == "1") {
-      std::cout << "Введите количество слов для топа (Enter для 10): ";
+      std::cout << loc::tr ("menu.input_words_limit");
       std::string limitStr;
       std::getline (std::cin, limitStr);
       size_t limit = 10;
@@ -288,11 +301,11 @@ void DocumentMenu::runInteractiveMenu () {
         }
       }
       showUniqueWords (limit);
-      std::cout << "\nНажмите Enter для возврата в меню...";
+      std::cout << "\n" << loc::tr ("menu.press_enter");
       std::string dummy;
       std::getline (std::cin, dummy);
     } else if (choice == "2") {
-      std::cout << "Введите количество слов для вывода позиций (Enter для 10): ";
+      std::cout << loc::tr ("menu.input_positions_limit");
       std::string limitStr;
       std::getline (std::cin, limitStr);
       size_t limit = 10;
@@ -304,51 +317,51 @@ void DocumentMenu::runInteractiveMenu () {
         }
       }
       showWordPositions (limit);
-      std::cout << "\nНажмите Enter для возврата в меню...";
+      std::cout << "\n" << loc::tr ("menu.press_enter");
       std::string dummy;
       std::getline (std::cin, dummy);
     } else if (choice == "3") {
-      std::cout << "Введите имя файла для отчета (Enter для 'report.txt'): ";
+      std::cout << loc::tr ("menu.input_report_filename");
       std::string outPath;
       std::getline (std::cin, outPath);
       if (outPath.empty ()) {
         outPath = "report.txt";
       }
       if (saveReportToFile (outPath)) {
-        std::cout << "Отчет успешно сохранен в файл: " << outPath << "\n";
+        std::cout << loc::tr ("menu.report_save_success") << outPath << "\n";
       } else {
-        std::cout << "Ошибка при записи отчета в файл!\n";
+        std::cout << loc::tr ("menu.report_save_error") << "\n";
       }
-      std::cout << "\nНажмите Enter для возврата в меню...";
+      std::cout << "\n" << loc::tr ("menu.press_enter");
       std::string dummy;
       std::getline (std::cin, dummy);
     } else if (choice == "4") {
-      std::cout << "Открыть через диалоговое окно (1) или ввести путь вручную (2)? [1]: ";
+      std::cout << loc::tr ("menu.open_dialog_choice");
       std::string openType;
       std::getline (std::cin, openType);
       std::string newPath;
       if (openType == "2") {
-        std::cout << "Введите полный путь к файлу: ";
+        std::cout << loc::tr ("menu.input_file_path");
         std::getline (std::cin, newPath);
       } else {
         newPath = OpenFileDialog ();
       }
 
       if (newPath.empty ()) {
-        std::cout << "Файл не выбран.\n";
+        std::cout << loc::tr ("menu.file_not_selected") << "\n";
       } else {
-        std::cout << "Загрузка файла " << newPath << " ...\n";
+        std::cout << loc::tr ("menu.loading_file") << newPath << " ...\n";
         if (loadFile (newPath)) {
-          std::cout << "Файл успешно загружен!\n";
+          std::cout << loc::tr ("menu.load_success") << "\n";
         } else {
-          std::cout << "Ошибка: не удалось загрузить файл.\n";
+          std::cout << loc::tr ("menu.load_error") << "\n";
         }
       }
-      std::cout << "\nНажмите Enter для возврата в меню...";
+      std::cout << "\n" << loc::tr ("menu.press_enter");
       std::string dummy;
       std::getline (std::cin, dummy);
     } else {
-      std::cout << "Неизвестный пункт меню. Повторите ввод.\n";
+      std::cout << loc::tr ("menu.unknown_choice") << "\n";
     }
   }
 }

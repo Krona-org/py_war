@@ -1,4 +1,5 @@
 #include "file_sync.h"
+#include "localization.h"
 #include "menu.h"
 
 #include <memory>
@@ -11,6 +12,7 @@ struct CliOptions {
   std::string filePath;
   int mode {-1}; // 1: частота слов, 2: количество встреч и позиций, 0: полный отчет
   std::string resultPath {"result.txt"}; // имя файла результата по умолчанию
+  std::string lang; // язык интерфейса (например "ru" или "en")
   bool hasMode {false};
   bool hasResult {false};
 };
@@ -38,6 +40,10 @@ CliOptions parseCommandLine (int argc, char *argv[]) {
         opts.resultPath = argv[++i];
         opts.hasResult = true;
       }
+    } else if (arg == "--lang" || arg == "-l") {
+      if (i + 1 < argc) {
+        opts.lang = argv[++i];
+      }
     } else if (arg == "--" && i + 1 < argc && std::string (argv[i + 1]) == "result") {
       // Поддержка варианта с пробелом: -- result "имя_файла"
       ++i;
@@ -55,6 +61,8 @@ CliOptions parseCommandLine (int argc, char *argv[]) {
     } else if (arg.rfind ("--result=", 0) == 0) {
       opts.resultPath = arg.substr (9);
       opts.hasResult = true;
+    } else if (arg.rfind ("--lang=", 0) == 0) {
+      opts.lang = arg.substr (7);
     } else if (!opts.hasMode && (arg == "0" || arg == "1" || arg == "2")) {
       opts.mode = std::stoi (arg);
       opts.hasMode = true;
@@ -67,12 +75,15 @@ CliOptions parseCommandLine (int argc, char *argv[]) {
 }
 
 int main (int argc, char *argv[]) {
-  // Установка кодировки UTF-8 для корректного отображения русского языка
+  // Установка кодировки UTF-8 для корректного отображения символов
   SetConsoleCP (65001);
   SetConsoleOutputCP (65001);
   std::ios::sync_with_stdio (false);
 
   CliOptions opts = parseCommandLine (argc, argv);
+
+  // Инициализация локализации из ресурсов
+  loc::init ("resources", opts.lang);
 
   // Регистрируем сессию межпроцессной синхронизации для выходного файла,
   // чтобы разделяемая память оставалась активной на протяжении всей работы параллельных процессов
@@ -85,7 +96,7 @@ int main (int argc, char *argv[]) {
   if (opts.filePath.empty ()) {
     opts.filePath = app::OpenFileDialog ();
     if (opts.filePath.empty ()) {
-      std::cout << "Файл не выбран. Завершение работы.\n";
+      std::cout << loc::tr ("main.file_not_selected") << "\n";
       return 0;
     }
   }
@@ -93,17 +104,17 @@ int main (int argc, char *argv[]) {
   // 2. Загружаем и анализируем документ
   app::DocumentMenu menu (opts.filePath);
   if (!menu.isLoaded ()) {
-    std::cout << "Ошибка: не удалось загрузить или отобразить файл: " << opts.filePath << "\n";
+    std::cout << loc::tr ("main.load_failed") << opts.filePath << "\n";
     return 1;
   }
 
   // 3. Если передан режим работы через аргументы (--mode 1, 2 или 0)
   if (opts.hasMode) {
     if (menu.saveModeReport (opts.mode, opts.resultPath, 10)) {
-      std::cout << "Результат успешно сохранен в файл: " << opts.resultPath << "\n";
+      std::cout << loc::tr ("main.result_saved") << opts.resultPath << "\n";
       return 0;
     } else {
-      std::cerr << "Ошибка при записи результата в файл: " << opts.resultPath << "\n";
+      std::cerr << loc::tr ("main.result_error") << opts.resultPath << "\n";
       return 1;
     }
   }

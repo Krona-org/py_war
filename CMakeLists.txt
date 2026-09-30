@@ -18,6 +18,7 @@ file(GLOB_RECURSE ALL_HEADERS CONFIGURE_DEPENDS
 add_executable(lab1 ${ALL_SOURCE} ${ALL_HEADERS})
 
 target_include_directories(lab1 PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/source"
     "${CMAKE_CURRENT_SOURCE_DIR}/source/scandocs/data"
     "${CMAKE_CURRENT_SOURCE_DIR}/source/work1_3"

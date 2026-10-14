@@ -20,4 +20,15 @@ add_executable(lab1 ${ALL_SOURCE} ${ALL_HEADERS})
 target_include_directories(lab1 PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/source"
     "${CMAKE_CURRENT_SOURCE_DIR}/source/scandocs/data"
+    "${CMAKE_CURRENT_SOURCE_DIR}/source/work1_3"
 )
+
+add_custom_command(TARGET lab1 POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources.txt"
+        $<TARGET_FILE_DIR:lab1>
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/languages.json"
+        $<TARGET_FILE_DIR:lab1>
+)
+

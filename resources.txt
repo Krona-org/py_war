@@ -1,0 +1,25 @@
+[ru]
+MENU_TITLE = ==================== ГЛАВНОЕ МЕНЮ ====================
+MENU_OPT_1 = 1. Подсчёт уникальных слов в файле
+MENU_OPT_2 = 2. Индексация позиций слов в файле
+MENU_OPT_3 = 3. STL 3a: Возведение простых чисел в квадрат
+MENU_OPT_4 = 4. STL 3b: Сортировка нечётных (возр.) и чётных (убыв.)
+MENU_OPT_5 = 5. STL 3c: Поиск уникальных чисел в диапазоне
+MENU_OPT_0 = 0. Выход
+PROMPT_SELECT = Выберите пункт меню: 
+PROMPT_FILE = Выберите входной файл через окно диалога...
+MSG_WAIT_LOCK = Ожидание очереди записи в файл...
+MSG_SUCCESS = Результат успешно записан в файл.
+
+[en]
+MENU_TITLE = ===================== MAIN MENU =====================
+MENU_OPT_1 = 1. Count unique words in file
+MENU_OPT_2 = 2. Index word positions in file
+MENU_OPT_3 = 3. STL 3a: Square prime numbers
+MENU_OPT_4 = 4. STL 3b: Sort odd (asc) and even (desc)
+MENU_OPT_5 = 5. STL 3c: Find unique numbers in range
+MENU_OPT_0 = 0. Exit
+PROMPT_SELECT = Select menu option: 
+PROMPT_FILE = Selecting input file via OpenDialog...
+MSG_WAIT_LOCK = Waiting in queue for file access...
+MSG_SUCCESS = Result successfully appended to file.
